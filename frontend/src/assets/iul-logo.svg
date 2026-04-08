@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 520" role="img" aria-labelledby="title desc">
+  <title id="title">CodingHQ Logo</title>
+  <desc id="desc">CodingHQ enterprise logo with layered geometric mark and wordmark.</desc>
+
+  <g transform="translate(80,60)">
+    <polygon points="20,90 180,20 180,95 95,130" fill="#e9152b"/>
+    <polygon points="190,20 350,90 275,130 190,95" fill="#e9152b"/>
+
+    <polygon points="20,90 180,160 180,235 20,165" fill="#5c77b8"/>
+    <polygon points="350,90 190,160 190,235 350,165" fill="#5c77b8"/>
+
+    <polygon points="20,275 180,205 180,280 95,315" fill="#ef894c"/>
+    <polygon points="190,205 350,275 275,315 190,280" fill="#ef894c"/>
+
+    <polygon points="20,275 180,345 180,420 20,350" fill="#f0c167"/>
+    <polygon points="350,275 190,345 190,420 350,350" fill="#f0c167"/>
+  </g>
+
+  <text x="530" y="305" font-family="Arial, Helvetica, sans-serif" font-size="220" font-weight="700" fill="#2f3545">Coding</text>
+  <text x="1300" y="305" font-family="Arial, Helvetica, sans-serif" font-size="220" font-weight="700" fill="#060b22">HQ</text>
+</svg>
