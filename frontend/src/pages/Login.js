@@ -21,6 +21,7 @@ import {
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import iulLogo from '../assets/iul-logo.svg';
+import { API_URL } from '../config/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -29,8 +30,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 

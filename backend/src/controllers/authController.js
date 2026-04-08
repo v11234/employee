@@ -10,8 +10,22 @@ const {
 const webAuthnAuthenticationChallenges = new Map();
 const webAuthnRegistrationChallenges = new Map();
 
-const rpID = process.env.WEBAUTHN_RP_ID || 'localhost';
-const rpOrigin = process.env.WEBAUTHN_ORIGIN || 'http://localhost:3000';
+const getWebAuthnConfig = (req) => {
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  const forwardedHost = req.headers['x-forwarded-host'];
+  const host = forwardedHost || req.headers.host || 'localhost:3000';
+  const originHeader = req.headers.origin;
+  const protocol = process.env.NODE_ENV === 'production'
+    ? (forwardedProto || 'https')
+    : (forwardedProto || req.protocol || 'http');
+  const derivedOrigin = originHeader || `${protocol}://${host}`;
+  const derivedRpId = new URL(derivedOrigin).hostname;
+
+  return {
+    rpID: process.env.WEBAUTHN_RP_ID || derivedRpId,
+    rpOrigin: process.env.WEBAUTHN_ORIGIN || derivedOrigin
+  };
+};
 
 const generateToken = (id, role, stage = 'full') => {
   const biometricVerified = stage === 'full';
@@ -109,6 +123,7 @@ const loginUser = async (req, res) => {
 // @access  Private (password-step token or full token)
 const generateRegistrationOptionsHandler = async (req, res) => {
   try {
+    const { rpID } = getWebAuthnConfig(req);
     const user = await User.findByPk(req.user.id);
 
     if (!user) {
@@ -147,6 +162,7 @@ const generateRegistrationOptionsHandler = async (req, res) => {
 // @access  Private (password-step token or full token)
 const verifyRegistrationHandler = async (req, res) => {
   try {
+    const { rpID, rpOrigin } = getWebAuthnConfig(req);
     const { credential } = req.body;
 
     if (!credential) {
@@ -202,6 +218,7 @@ const verifyRegistrationHandler = async (req, res) => {
 // @access  Private (password-step token or full token)
 const generateAuthenticationOptionsHandler = async (req, res) => {
   try {
+    const { rpID } = getWebAuthnConfig(req);
     const user = await User.findByPk(req.user.id);
 
     if (!user) {
@@ -242,6 +259,7 @@ const generateAuthenticationOptionsHandler = async (req, res) => {
 // @access  Private (password-step token or full token)
 const verifyAuthenticationHandler = async (req, res) => {
   try {
+    const { rpID, rpOrigin } = getWebAuthnConfig(req);
     const { credential } = req.body;
 
     if (!credential) {

@@ -43,8 +43,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import { format } from 'date-fns';
-
-const API_URL = 'http://localhost:5000/api';
+import { API_URL } from '../config/api';
 
 export default function Performance() {
   const [employees, setEmployees] = useState([]);

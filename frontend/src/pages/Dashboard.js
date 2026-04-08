@@ -28,8 +28,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import axios from 'axios';
 import { format, parseISO } from 'date-fns';
-
-const API_URL = 'http://localhost:5000/api';
+import { API_URL } from '../config/api';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({

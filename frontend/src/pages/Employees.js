@@ -46,8 +46,7 @@ import {
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { format } from 'date-fns';
-
-const API_URL = 'http://localhost:5000/api';
+import { API_URL } from '../config/api';
 
 export default function Employees() {
   const [employees, setEmployees] = useState([]);

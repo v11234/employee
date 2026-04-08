@@ -57,8 +57,7 @@ import { DataGrid } from '@mui/x-data-grid';
 import axios from 'axios';
 import { format, parseISO, differenceInMinutes } from 'date-fns';
 import { toast } from 'react-toastify';
-
-const API_URL = 'http://localhost:5000/api';
+import { API_URL } from '../config/api';
 
 export default function Attendance() {
   // State
@@ -438,7 +437,7 @@ export default function Attendance() {
             variant="contained"
             startIcon={<Refresh />}
             onClick={fetchAttendance}
- N          >
+          >
             Refresh
           </Button>
         </Box>

@@ -12,6 +12,7 @@ import KeyIcon from '@mui/icons-material/Key';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import iulLogo from '../assets/iul-logo.svg';
+import { API_URL } from '../config/api';
 
 const base64UrlToBuffer = (base64Url) => {
   const padding = '='.repeat((4 - (base64Url.length % 4)) % 4);
@@ -63,7 +64,6 @@ export default function EnrollPasskey() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
   const token = localStorage.getItem('preAuthToken') || localStorage.getItem('token');
 
   const logoutToLogin = () => {
