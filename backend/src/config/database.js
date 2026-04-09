@@ -1,5 +1,6 @@
 const { Sequelize } = require('sequelize');
 const dotenv = require('dotenv');
+const pg = require('pg');
 
 dotenv.config();
 
@@ -16,6 +17,7 @@ const useSsl =
 
 const baseConfig = {
   dialect: 'postgres',
+  dialectModule: pg,
   logging: false,
   dialectOptions: useSsl
     ? {
