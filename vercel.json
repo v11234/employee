@@ -1,33 +1,20 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/[...path].js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build"
-      }
+  "buildCommand": "npm run build",
+  "outputDirectory": "frontend/build",
+  "functions": {
+    "api/[...path].js": {
+      "runtime": "nodejs20.x"
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/[...path].js"
+      "source": "/api/(.*)",
+      "destination": "/api/[...path]"
     },
     {
-      "src": "/",
-      "dest": "/index.html"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
