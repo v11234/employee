@@ -1,4 +1,4 @@
-const { User } = require('../models');
+const { User, WebAuthnCredential } = require('../models');
 const jwt = require('jsonwebtoken');
 const {
   generateRegistrationOptions,
@@ -9,6 +9,73 @@ const {
 
 const webAuthnAuthenticationChallenges = new Map();
 const webAuthnRegistrationChallenges = new Map();
+let ensurePasskeyTablePromise;
+
+const ensurePasskeyTable = async () => {
+  if (!ensurePasskeyTablePromise) {
+    ensurePasskeyTablePromise = WebAuthnCredential.sync();
+  }
+
+  return ensurePasskeyTablePromise;
+};
+
+const getStoredPasskeys = async (user) => {
+  await ensurePasskeyTable();
+
+  if (user.webauthnCredentialId && user.webauthnPublicKey) {
+    await WebAuthnCredential.findOrCreate({
+      where: { credentialId: user.webauthnCredentialId },
+      defaults: {
+        userId: user.id,
+        credentialId: user.webauthnCredentialId,
+        publicKey: user.webauthnPublicKey,
+        counter: Number(user.webauthnCounter || 0)
+      }
+    });
+  }
+
+  const storedPasskeys = await WebAuthnCredential.findAll({
+    where: { userId: user.id },
+    order: [['createdAt', 'ASC']]
+  });
+
+  return storedPasskeys.map((passkey) => ({
+    id: passkey.credentialId,
+    publicKey: passkey.publicKey,
+    counter: Number(passkey.counter || 0)
+  }));
+};
+
+const savePasskey = async (user, passkey) => {
+  await ensurePasskeyTable();
+
+  await WebAuthnCredential.upsert({
+    userId: user.id,
+    credentialId: passkey.id,
+    publicKey: passkey.publicKey,
+    counter: Number(passkey.counter || 0)
+  });
+
+  // Keep legacy fields populated for backward compatibility with older data flows.
+  await user.update({
+    webauthnCredentialId: passkey.id,
+    webauthnPublicKey: passkey.publicKey,
+    webauthnCounter: Number(passkey.counter || 0)
+  });
+};
+
+const updatePasskeyCounter = async (user, credentialId, counter) => {
+  await ensurePasskeyTable();
+
+  await WebAuthnCredential.update(
+    { counter: Number(counter || 0) },
+    { where: { userId: user.id, credentialId } }
+  );
+
+  if (user.webauthnCredentialId === credentialId) {
+    await user.update({ webauthnCounter: Number(counter || 0) });
+  }
+};
 
 const getWebAuthnConfig = (req) => {
   const forwardedProto = req.headers['x-forwarded-proto'];
@@ -130,6 +197,8 @@ const generateRegistrationOptionsHandler = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    const passkeys = await getStoredPasskeys(user);
+
     const options = await generateRegistrationOptions({
       rpName: process.env.WEBAUTHN_RP_NAME || 'IUL University Management System',
       rpID,
@@ -141,9 +210,11 @@ const generateRegistrationOptionsHandler = async (req, res) => {
         residentKey: 'preferred',
         userVerification: 'preferred'
       },
-      excludeCredentials: user.webauthnCredentialId
-        ? [{ id: user.webauthnCredentialId, type: 'public-key', transports: ['internal', 'hybrid', 'usb', 'nfc', 'ble'] }]
-        : []
+      excludeCredentials: passkeys.map((passkey) => ({
+        id: passkey.id,
+        type: 'public-key',
+        transports: ['internal', 'hybrid', 'usb', 'nfc', 'ble']
+      }))
     });
 
     webAuthnRegistrationChallenges.set(user.id, {
@@ -197,10 +268,10 @@ const verifyRegistrationHandler = async (req, res) => {
       return res.status(401).json({ message: 'Invalid registration response' });
     }
 
-    await user.update({
-      webauthnCredentialId: registeredCredential.id,
-      webauthnPublicKey: Buffer.from(registeredCredential.publicKey).toString('base64url'),
-      webauthnCounter: registeredCredential.counter || 0
+    await savePasskey(user, {
+      id: registeredCredential.id,
+      publicKey: Buffer.from(registeredCredential.publicKey).toString('base64url'),
+      counter: registeredCredential.counter || 0
     });
 
     cleanChallengeMaps(user.id);
@@ -225,7 +296,9 @@ const generateAuthenticationOptionsHandler = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    if (!user.webauthnCredentialId || !user.webauthnPublicKey) {
+    const passkeys = await getStoredPasskeys(user);
+
+    if (passkeys.length === 0) {
       return res.status(400).json({
         message: 'No biometric credential enrolled for this user. Please enroll a passkey first.'
       });
@@ -234,13 +307,11 @@ const generateAuthenticationOptionsHandler = async (req, res) => {
     const options = await generateAuthenticationOptions({
       rpID,
       userVerification: 'preferred',
-      allowCredentials: [
-        {
-          id: user.webauthnCredentialId,
+      allowCredentials: passkeys.map((passkey) => ({
+          id: passkey.id,
           type: 'public-key',
           transports: ['internal', 'hybrid', 'usb', 'nfc', 'ble']
-        }
-      ]
+        }))
     });
 
     webAuthnAuthenticationChallenges.set(user.id, {
@@ -271,14 +342,25 @@ const verifyAuthenticationHandler = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    const passkeys = await getStoredPasskeys(user);
+
     const challengeRecord = webAuthnAuthenticationChallenges.get(user.id);
     if (!challengeRecord || challengeRecord.expiresAt < Date.now()) {
       return res.status(400).json({ message: 'Authentication challenge expired. Please retry.' });
     }
 
-    if (!user.webauthnCredentialId || !user.webauthnPublicKey) {
+    if (passkeys.length === 0) {
       return res.status(400).json({
         message: 'No biometric credential enrolled for this user. Please enroll a passkey first.'
+      });
+    }
+
+    const credentialId = credential.id || credential.rawId;
+    const matchingPasskey = passkeys.find((passkey) => passkey.id === credentialId);
+
+    if (!matchingPasskey) {
+      return res.status(401).json({
+        message: 'This device passkey is not enrolled yet. Please enroll this device first.'
       });
     }
 
@@ -289,9 +371,9 @@ const verifyAuthenticationHandler = async (req, res) => {
       expectedRPID: rpID,
       requireUserVerification: false,
       credential: {
-        id: user.webauthnCredentialId,
-        publicKey: Buffer.from(user.webauthnPublicKey, 'base64url'),
-        counter: user.webauthnCounter || 0,
+        id: matchingPasskey.id,
+        publicKey: Buffer.from(matchingPasskey.publicKey, 'base64url'),
+        counter: matchingPasskey.counter || 0,
         transports: ['internal', 'hybrid', 'usb', 'nfc', 'ble']
       }
     });
@@ -300,7 +382,7 @@ const verifyAuthenticationHandler = async (req, res) => {
       return res.status(401).json({ message: 'Biometric verification failed' });
     }
 
-    await user.update({ webauthnCounter: verification.authenticationInfo.newCounter });
+    await updatePasskeyCounter(user, matchingPasskey.id, verification.authenticationInfo.newCounter);
     cleanChallengeMaps(user.id);
 
     res.json({

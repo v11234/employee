@@ -85,6 +85,10 @@ User.associate = (models) => {
     foreignKey: 'user_id',
     as: 'employee'
   });
+  User.hasMany(models.WebAuthnCredential, {
+    foreignKey: 'userId',
+    as: 'webauthnCredentials'
+  });
 };
 
 module.exports = User;

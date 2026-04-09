@@ -18,6 +18,7 @@ const Applicant = require('./Applicant');
 const Training = require('./Training');
 const TrainingSession = require('./TrainingSession');
 const TrainingEnrollment = require('./TrainingEnrollment');
+const WebAuthnCredential = require('./WebAuthnCredential');
 
 // Initialize models object
 const models = {
@@ -33,11 +34,12 @@ Attendance,
 Sanction,
 LeaveType,
 LeaveRequest,
-Recruitment,
-Applicant,
-Training,
-TrainingSession,
-TrainingEnrollment
+  Recruitment,
+  Applicant,
+  Training,
+  TrainingSession,
+  TrainingEnrollment,
+  WebAuthnCredential
 };
 
 // Define associations
