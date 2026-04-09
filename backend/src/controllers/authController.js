@@ -35,8 +35,7 @@ const getStoredPasskeys = async (user) => {
   }
 
   const storedPasskeys = await WebAuthnCredential.findAll({
-    where: { userId: user.id },
-    order: [['createdAt', 'ASC']]
+    where: { userId: user.id }
   });
 
   return storedPasskeys.map((passkey) => ({
