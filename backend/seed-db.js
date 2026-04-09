@@ -126,6 +126,13 @@ const seedDatabase = async () => {
         firstName: 'Super',
         lastName: 'Admin'
       },
+        {
+        email: 'vanettijunior@gmail.com',
+        password: 'admin123',
+        role: 'director',
+        firstName: 'Super',
+        lastName: 'Admin'
+      },
       {
         email: 'hr@iul.edu',
         password: 'hr123456',

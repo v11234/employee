@@ -60,7 +60,12 @@ export default function Login() {
         toast.error('Biometric verification is required for this account.');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password');
+      const serverMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message;
+
+      setError(serverMessage || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
