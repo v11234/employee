@@ -2,6 +2,11 @@
   "version": 2,
   "buildCommand": "npm run build",
   "outputDirectory": "frontend/build",
+  "functions": {
+    "api/[...path].js": {
+      "includeFiles": "backend/node_modules/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
