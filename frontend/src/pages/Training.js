@@ -81,8 +81,13 @@ import {
 import { DataGrid } from '@mui/x-data-grid';
 import { format, addDays, differenceInDays } from 'date-fns';
 import { toast } from 'react-toastify';
+import axios from 'axios';
+import { API_URL } from '../config/api';
+import { getStoredUser } from '../config/access';
 
 export default function Training() {
+  const user = getStoredUser();
+  const isWorker = user.role === 'worker';
   // State
   const [loading, setLoading] = useState(false);
   const [tabValue, setTabValue] = useState(0);
@@ -153,6 +158,11 @@ export default function Training() {
 
   // Mock data - Trainings
   useEffect(() => {
+    if (isWorker) {
+      fetchMyTrainings();
+      return;
+    }
+
     setTrainings([
       {
         id: 1,
@@ -335,7 +345,36 @@ export default function Training() {
       { id: 5, employeeId: 5, employeeName: 'Claire Abena', trainingId: 3, sessionId: 5, status: 'completed', enrollmentDate: '2026-02-20', completionDate: '2026-03-07', score: 92 },
       { id: 6, employeeId: 6, employeeName: 'Luc Tchamba', trainingId: 6, sessionId: 6, status: 'completed', enrollmentDate: '2026-02-15', completionDate: '2026-03-01', score: 78 }
     ]);
-  }, []);
+  }, [isWorker]);
+
+  const fetchMyTrainings = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.get(`${API_URL}/training/my-trainings`, { headers });
+      const allEnrollments = response.data.all || [];
+
+      setEnrollments(allEnrollments);
+      setSessions(allEnrollments.map((item) => ({
+        id: item.session?.id || item.id,
+        trainingName: item.session?.training?.name || 'Training',
+        startDate: item.session?.startDate,
+        endDate: item.session?.endDate,
+        trainer: item.session?.trainer
+          ? `${item.session.trainer.firstName} ${item.session.trainer.lastName}`
+          : 'TBA',
+        location: item.session?.location || '-',
+        status: item.status,
+        score: item.performanceScore,
+        enrollmentDate: item.enrollmentDate
+      })));
+    } catch (error) {
+      showSnackbar(error.response?.data?.message || 'Failed to load training data', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const showSnackbar = (message, severity = 'success') => {
     setSnackbar({ open: true, message, severity });
@@ -656,6 +695,86 @@ export default function Training() {
       )
     }
   ];
+
+  if (isWorker) {
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1.5 }}>
+          <Typography variant="h4" color="primary.main">
+            My Training
+          </Typography>
+          <Button variant="contained" startIcon={<Refresh />} onClick={fetchMyTrainings}>
+            Refresh
+          </Button>
+        </Box>
+
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} sm={4}>
+            <Card><CardContent><Typography color="textSecondary">Completed</Typography><Typography variant="h4">{enrollments.filter((e) => e.status === 'completed').length}</Typography></CardContent></Card>
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <Card><CardContent><Typography color="textSecondary">In Progress</Typography><Typography variant="h4">{enrollments.filter((e) => e.status === 'in-progress').length}</Typography></CardContent></Card>
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <Card><CardContent><Typography color="textSecondary">Enrolled</Typography><Typography variant="h4">{enrollments.filter((e) => e.status === 'enrolled').length}</Typography></CardContent></Card>
+          </Grid>
+        </Grid>
+
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>Upcoming and Active</Typography>
+                <List>
+                  {sessions.filter((session) => session.status !== 'completed').map((session) => (
+                    <ListItem key={session.id}>
+                      <ListItemAvatar>
+                        <Avatar sx={{ bgcolor: '#1a2b6f' }}>
+                          <School />
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={session.trainingName}
+                        secondary={`${session.startDate ? format(new Date(session.startDate), 'dd MMM yyyy') : 'TBA'} | ${session.location}`}
+                      />
+                      {getEnrollmentStatusChip(session.status)}
+                    </ListItem>
+                  ))}
+                </List>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>Completed Training</Typography>
+                <List>
+                  {sessions.filter((session) => session.status === 'completed').map((session) => (
+                    <ListItem key={session.id}>
+                      <ListItemAvatar>
+                        <Avatar sx={{ bgcolor: '#2E7D32' }}>
+                          <CheckCircle />
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={session.trainingName}
+                        secondary={`Trainer: ${session.trainer}`}
+                      />
+                      {session.score ? <Chip label={`${session.score}%`} color="success" size="small" /> : null}
+                    </ListItem>
+                  ))}
+                </List>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+        </Snackbar>
+      </Box>
+    );
+  }
 
   return (
     <Box>

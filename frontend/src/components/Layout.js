@@ -38,20 +38,21 @@ import {
   TrendingUp
 } from '@mui/icons-material';
 import iulLogo from '../assets/iul-logo.svg';
+import { MENU_ITEMS, getStoredUser } from '../config/access';
 
 const drawerWidth = 260;
 
-const menuItems = [
-  { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard' },
-  { text: 'Employees', icon: <People />, path: '/employees' },
-  { text: 'Attendance', icon: <AccessTime />, path: '/attendance' },
-  { text: 'Timetables', icon: <Schedule />, path: '/shifts' },
-  { text: 'Leave & Permissions', icon: <BeachAccess />, path: '/leave' },
-  { text: 'Admissions', icon: <HowToReg />, path: '/recruitment' },
-  { text: 'Courses & Training', icon: <School />, path: '/training' },
-  { text: 'Finance', icon: <AttachMoney />, path: '/payroll' },
-  { text: 'Academic Performance', icon: <TrendingUp />, path: '/performance' },
-];
+const menuIcons = {
+  '/dashboard': <Dashboard />,
+  '/employees': <People />,
+  '/attendance': <AccessTime />,
+  '/shifts': <Schedule />,
+  '/leave': <BeachAccess />,
+  '/recruitment': <HowToReg />,
+  '/training': <School />,
+  '/payroll': <AttachMoney />,
+  '/performance': <TrendingUp />
+};
 
 
 export default function Layout() {
@@ -97,7 +98,13 @@ export default function Layout() {
     navigate('/login');
   };
 
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const user = getStoredUser();
+  const menuItems = MENU_ITEMS
+    .filter((item) => item.roles.includes(user.role))
+    .map((item) => ({
+      ...item,
+      icon: menuIcons[item.path]
+    }));
 
   return (
     <Box sx={{ display: 'flex' }}>

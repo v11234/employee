@@ -58,8 +58,11 @@ import axios from 'axios';
 import { format, parseISO, differenceInMinutes } from 'date-fns';
 import { toast } from 'react-toastify';
 import { API_URL } from '../config/api';
+import { getStoredUser } from '../config/access';
 
 export default function Attendance() {
+  const user = getStoredUser();
+  const isWorker = user.role === 'worker';
   // State
   const [loading, setLoading] = useState(false);
   const [employeeCode, setEmployeeCode] = useState('');
@@ -122,6 +125,42 @@ export default function Attendance() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+
+      if (isWorker) {
+        const month = format(new Date(selectedDate), 'M');
+        const year = format(new Date(selectedDate), 'yyyy');
+        const response = await axios.get(`${API_URL}/attendance/my-history?month=${month}&year=${year}`, { headers });
+        const records = response.data.records || [];
+
+        setAttendanceRecords(records.map((record) => ({
+          id: record.id,
+          employeeId: record.employeeId,
+          employeeName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'My Attendance',
+          employeeCode: user.email || '',
+          position: user.role,
+          line: '-',
+          shift: record.scheduledShift?.name || '-',
+          checkIn: record.checkInTime,
+          checkOut: record.checkOutTime,
+          status: record.status,
+          lateMinutes: record.lateMinutes || 0,
+          nightBonus: record.nightBonusEarned,
+          sanction: record.sanctionApplied,
+          sanctionAmount: record.sanctionAmount || 0,
+          date: record.date
+        })));
+        setStats({
+          present: response.data.stats?.present || 0,
+          late: response.data.stats?.late || 0,
+          absent: response.data.stats?.absent || 0,
+          total: response.data.stats?.total || 0,
+          nightShifts: response.data.stats?.nightBonuses || 0,
+          sanctions: response.data.stats?.sanctions || 0
+        });
+        return;
+      }
+
       // In real app, fetch from API
       // Mock data for demonstration
       const mockData = [
@@ -408,6 +447,118 @@ export default function Attendance() {
       )
     }
   ];
+
+  if (isWorker) {
+    const workerColumns = [
+      {
+        field: 'date',
+        headerName: 'Date',
+        width: 120,
+        valueGetter: (params) => format(new Date(params.value), 'dd/MM/yy')
+      },
+      { field: 'shift', headerName: 'Shift', width: 140 },
+      {
+        field: 'checkIn',
+        headerName: 'Check In',
+        width: 120,
+        valueGetter: (params) => params.value ? format(parseISO(params.value), 'HH:mm') : '-'
+      },
+      {
+        field: 'checkOut',
+        headerName: 'Check Out',
+        width: 120,
+        valueGetter: (params) => params.value ? format(parseISO(params.value), 'HH:mm') : '-'
+      },
+      {
+        field: 'status',
+        headerName: 'Status',
+        width: 120,
+        renderCell: (params) => getStatusChip(params.value)
+      },
+      {
+        field: 'lateMinutes',
+        headerName: 'Late',
+        width: 100,
+        valueGetter: (params) => params.value > 0 ? `${params.value} min` : '-'
+      },
+      {
+        field: 'nightBonus',
+        headerName: 'Night Bonus',
+        width: 120,
+        renderCell: (params) => params.value ? <Chip size="small" label="500 CFA" color="primary" /> : '-'
+      }
+    ];
+
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1.5 }}>
+          <Typography variant="h4" color="primary.main">
+            My Attendance
+          </Typography>
+          <Button variant="contained" startIcon={<Refresh />} onClick={fetchAttendance}>
+            Refresh
+          </Button>
+        </Box>
+
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card><CardContent><Typography color="textSecondary">Present</Typography><Typography variant="h4">{stats.present}</Typography></CardContent></Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card><CardContent><Typography color="textSecondary">Late</Typography><Typography variant="h4">{stats.late}</Typography></CardContent></Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card><CardContent><Typography color="textSecondary">Absent</Typography><Typography variant="h4">{stats.absent}</Typography></CardContent></Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card><CardContent><Typography color="textSecondary">Night Bonus</Typography><Typography variant="h4">{stats.nightShifts * 500} CFA</Typography></CardContent></Card>
+          </Grid>
+        </Grid>
+
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Month"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  size="small"
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Chip label={`Sanctions: ${stats.sanctions}`} color={stats.sanctions ? 'error' : 'default'} />
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent>
+            <DataGrid
+              rows={attendanceRecords}
+              columns={workerColumns}
+              pageSize={10}
+              rowsPerPageOptions={[10, 25, 50]}
+              autoHeight
+              loading={loading}
+              disableSelectionOnClick
+              getRowId={(row) => row.id}
+            />
+          </CardContent>
+        </Card>
+
+        <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          <Alert severity={snackbar.severity} sx={{ width: '100%' }}>
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </Box>
+    );
+  }
 
   return (
     <Box>

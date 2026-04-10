@@ -57,8 +57,13 @@ import {
 import { DataGrid } from '@mui/x-data-grid';
 import { format, addWeeks, startOfWeek, addDays } from 'date-fns';
 import { toast } from 'react-toastify';
+import axios from 'axios';
+import { API_URL } from '../config/api';
+import { getStoredUser } from '../config/access';
 
 export default function Shifts() {
+  const user = getStoredUser();
+  const isWorker = user.role === 'worker';
   // State
   const [loading, setLoading] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState(format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'));
@@ -109,8 +114,42 @@ export default function Shifts() {
   ]);
 
   useEffect(() => {
+    if (isWorker) {
+      fetchMySchedule();
+      return;
+    }
+
     generateMockData();
   }, [selectedWeek]);
+
+  const fetchMySchedule = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await axios.get(`${API_URL}/shifts/my-schedule?weekStart=${selectedWeek}`, { headers });
+      const scheduleData = response.data || [];
+
+      setSchedules(scheduleData.map((schedule) => ({
+        id: schedule.id,
+        employeeId: schedule.employeeId,
+        employeeName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'My Schedule',
+        employeeCode: user.email || '',
+        line: schedule.productionLine?.id || 0,
+        lineName: schedule.productionLine?.name || '-',
+        date: schedule.date,
+        dayName: format(new Date(schedule.date), 'EEEE'),
+        shiftId: schedule.shift?.id || 0,
+        shiftName: schedule.shift?.name || '-',
+        shiftTime: schedule.shift ? `${schedule.shift.startTime} - ${schedule.shift.endTime}` : '-',
+        status: 'scheduled'
+      })));
+    } catch (error) {
+      showSnackbar(error.response?.data?.message || 'Failed to load schedule', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const generateMockData = () => {
     setLoading(true);
@@ -379,6 +418,80 @@ export default function Shifts() {
       )
     }
   ];
+
+  if (isWorker) {
+    const workerColumns = [
+      {
+        field: 'date',
+        headerName: 'Date',
+        width: 120,
+        valueGetter: (params) => format(new Date(params.value), 'dd/MM/yy')
+      },
+      { field: 'dayName', headerName: 'Day', width: 120 },
+      {
+        field: 'shiftName',
+        headerName: 'Shift',
+        width: 160,
+        renderCell: (params) => getShiftChip(params.row.shiftId)
+      },
+      { field: 'shiftTime', headerName: 'Hours', width: 180 },
+      { field: 'lineName', headerName: 'Line', width: 180 }
+    ];
+
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1.5 }}>
+          <Typography variant="h4" color="primary.main">
+            My Schedule
+          </Typography>
+          <Button variant="contained" startIcon={<Refresh />} onClick={fetchMySchedule}>
+            Refresh
+          </Button>
+        </Box>
+
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Week Starting"
+                  value={selectedWeek}
+                  onChange={(e) => setSelectedWeek(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={12} md={8}>
+                <Alert severity="info">
+                  This page shows only your personal weekly schedule.
+                </Alert>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent>
+            <DataGrid
+              rows={schedules}
+              columns={workerColumns}
+              pageSize={10}
+              rowsPerPageOptions={[10, 25, 50]}
+              autoHeight
+              loading={loading}
+              disableSelectionOnClick
+              getRowId={(row) => row.id}
+            />
+          </CardContent>
+        </Card>
+
+        <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+        </Snackbar>
+      </Box>
+    );
+  }
 
   return (
     <Box>

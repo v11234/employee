@@ -60,8 +60,13 @@ import {
 import { DataGrid } from '@mui/x-data-grid';
 import { format, addDays, differenceInDays } from 'date-fns';
 import { toast } from 'react-toastify';
+import axios from 'axios';
+import { API_URL } from '../config/api';
+import { getStoredUser } from '../config/access';
 
 export default function Leave() {
+  const user = getStoredUser();
+  const isWorker = user.role === 'worker';
   // State
   const [loading, setLoading] = useState(false);
   const [tabValue, setTabValue] = useState(0);
@@ -72,6 +77,7 @@ export default function Leave() {
   const [dialogMode, setDialogMode] = useState('view'); // 'view', 'new', 'approve'
   const [openMedicalDialog, setOpenMedicalDialog] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [leaveBalance, setLeaveBalance] = useState([]);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -91,6 +97,11 @@ export default function Leave() {
 
   // Mock data - Leave Types
   useEffect(() => {
+    if (isWorker) {
+      fetchWorkerLeaveData();
+      return;
+    }
+
     setLeaveTypes([
       { id: 1, name: 'Annual Leave', daysPerYear: 22, icon: <BeachAccess />, color: '#2E7D32', requiresMedical: false, paid: true },
       { id: 2, name: 'Sick Leave', daysPerYear: 30, icon: <MedicalServices />, color: '#F57C00', requiresMedical: true, paid: true },
@@ -198,7 +209,61 @@ export default function Leave() {
         medicalBooklet: 'medical_002.pdf'
       }
     ]);
-  }, []);
+  }, [isWorker]);
+
+  const fetchWorkerLeaveData = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      const [requestsRes, balanceRes] = await Promise.all([
+        axios.get(`${API_URL}/leave/my-requests`, { headers }),
+        axios.get(`${API_URL}/leave/my-balance`, { headers })
+      ]);
+
+      const balanceData = balanceRes.data || [];
+      setLeaveBalance(balanceData);
+      setLeaveTypes(
+        balanceData.map((item, index) => ({
+          id: index + 1,
+          apiId: index + 1,
+          name: item.leaveType,
+          daysPerYear: item.total,
+          remaining: item.remaining,
+          icon: item.requiresMedicalBooklet ? <MedicalServices /> : <BeachAccess />,
+          color: item.requiresMedicalBooklet ? '#F57C00' : '#2E7D32',
+          requiresMedical: item.requiresMedicalBooklet,
+          paid: item.total > 0
+        }))
+      );
+
+      setLeaveRequests(
+        (requestsRes.data || []).map((request) => ({
+          id: request.id,
+          employeeName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'My Request',
+          employeeCode: user.email || '',
+          leaveTypeId: balanceData.findIndex(
+            (item) => item.leaveType.toLowerCase() === request.leaveType?.name?.toLowerCase()
+          ) + 1,
+          leaveType: request.leaveType?.name || 'Leave',
+          startDate: request.startDate,
+          endDate: request.endDate,
+          days: differenceInDays(new Date(request.endDate), new Date(request.startDate)) + 1,
+          reason: request.reason,
+          status: request.status,
+          appliedDate: request.createdAt || request.created_at || request.startDate,
+          approvedBy: request.approvedBy,
+          approvedDate: request.approvedAt || request.approved_at,
+          rejectionReason: request.rejectionReason,
+          medicalBooklet: null
+        }))
+      );
+    } catch (error) {
+      showSnackbar(error.response?.data?.message || 'Failed to load leave data', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const showSnackbar = (message, severity = 'success') => {
     setSnackbar({ open: true, message, severity });
@@ -251,6 +316,11 @@ export default function Leave() {
   };
 
   const handleSubmitRequest = () => {
+    if (isWorker) {
+      handleSubmitWorkerRequest();
+      return;
+    }
+
     // Validate
     if (!formData.leaveTypeId) {
       showSnackbar('Please select leave type', 'warning');
@@ -294,6 +364,36 @@ export default function Leave() {
     
     setLeaveRequests(prev => [newRequest, ...prev]);
     setOpenDialog(false);
+  };
+
+  const handleSubmitWorkerRequest = async () => {
+    if (!formData.leaveTypeId) {
+      showSnackbar('Please select leave type', 'warning');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.post(
+        `${API_URL}/leave/request`,
+        {
+          leaveTypeId: formData.leaveTypeId,
+          startDate: formData.startDate,
+          endDate: formData.endDate,
+          reason: formData.reason
+        },
+        { headers }
+      );
+      showSnackbar('Leave request submitted', 'success');
+      setOpenDialog(false);
+      await fetchWorkerLeaveData();
+    } catch (error) {
+      showSnackbar(error.response?.data?.message || 'Failed to submit leave request', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleMedicalUpload = () => {
@@ -473,6 +573,149 @@ export default function Leave() {
       )
     }
   ];
+
+  if (isWorker) {
+    const workerColumns = columns.filter((column) =>
+      ['leaveType', 'startDate', 'endDate', 'days', 'status', 'appliedDate', 'actions'].includes(column.field)
+    );
+
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1.5 }}>
+          <Typography variant="h4" color="primary.main">
+            My Leave
+          </Typography>
+          <Button variant="contained" startIcon={<Add />} onClick={handleNewRequest}>
+            Request Leave
+          </Button>
+        </Box>
+
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {leaveBalance.map((balance) => (
+            <Grid item xs={12} sm={6} md={4} key={balance.leaveType}>
+              <Card>
+                <CardContent>
+                  <Typography color="textSecondary" gutterBottom>
+                    {balance.leaveType}
+                  </Typography>
+                  <Typography variant="h5">{balance.remaining} days left</Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    Taken: {balance.taken} / {balance.total}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+
+        <Paper sx={{ mb: 3 }}>
+          <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)}>
+            <Tab label="All Requests" />
+            <Tab label="Pending" />
+            <Tab label="Approved" />
+            <Tab label="Rejected" />
+          </Tabs>
+        </Paper>
+
+        <Card>
+          <CardContent>
+            <DataGrid
+              rows={filteredRequests}
+              columns={workerColumns}
+              pageSize={10}
+              rowsPerPageOptions={[10, 25, 50]}
+              autoHeight
+              loading={loading}
+              disableSelectionOnClick
+              getRowId={(row) => row.id}
+            />
+          </CardContent>
+        </Card>
+
+        <Dialog open={openDialog && dialogMode === 'new'} onClose={() => setOpenDialog(false)} maxWidth="md" fullWidth>
+          <DialogTitle>New Leave Request</DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Leave Type</InputLabel>
+                  <Select
+                    value={formData.leaveTypeId}
+                    label="Leave Type"
+                    onChange={(e) => setFormData({ ...formData, leaveTypeId: e.target.value })}
+                  >
+                    {leaveTypes.map((type) => (
+                      <MenuItem key={type.id} value={type.id}>
+                        {type.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Start Date"
+                  value={formData.startDate}
+                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="End Date"
+                  value={formData.endDate}
+                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={3}
+                  label="Reason"
+                  value={formData.reason}
+                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
+            <Button onClick={handleSubmitRequest} variant="contained">Submit Request</Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={openDialog && dialogMode === 'view'} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Leave Request Details</DialogTitle>
+          <DialogContent>
+            {selectedRequest && (
+              <Box sx={{ mt: 2 }}>
+                <Typography><strong>Type:</strong> {selectedRequest.leaveType}</Typography>
+                <Typography><strong>Dates:</strong> {format(new Date(selectedRequest.startDate), 'dd MMM yyyy')} - {format(new Date(selectedRequest.endDate), 'dd MMM yyyy')}</Typography>
+                <Typography><strong>Status:</strong> {selectedRequest.status}</Typography>
+                <Typography><strong>Reason:</strong> {selectedRequest.reason}</Typography>
+                {selectedRequest.rejectionReason && (
+                  <Alert severity="error" sx={{ mt: 2 }}>{selectedRequest.rejectionReason}</Alert>
+                )}
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenDialog(false)}>Close</Button>
+          </DialogActions>
+        </Dialog>
+
+        <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
+        </Snackbar>
+      </Box>
+    );
+  }
 
   return (
     <Box>

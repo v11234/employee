@@ -60,13 +60,15 @@ import BiometricVerification from './pages/BiometricVerification';
 import EnrollPasskey from './pages/EnrollPasskey';
 import Layout from './components/Layout';
 import PrivateRoute from './components/PrivateRoute';
+import { ROUTE_ACCESS, getDefaultRouteForRole, getStoredUser } from './config/access';
 
 function HomeRedirect() {
   const token = localStorage.getItem('token');
   const preAuthToken = localStorage.getItem('preAuthToken');
+  const user = getStoredUser();
 
   if (token) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={getDefaultRouteForRole(user.role)} replace />;
   }
 
   if (preAuthToken) {
@@ -93,15 +95,15 @@ function App() {
           
           {/* Protected routes - require authentication */}
           <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/employees" element={<Employees />} />
-            <Route path="/attendance" element={<Attendance />} />
-            <Route path="/shifts" element={<Shifts />} />
-            <Route path="/leave" element={<Leave />} />
-            <Route path="/recruitment" element={<Recruitment />} />
-            <Route path="/training" element={<Training />} />
-            <Route path="/payroll" element={<Payroll />} />
-            <Route path="/performance" element={<Performance />} />
+            <Route path="/dashboard" element={<PrivateRoute allowedRoles={ROUTE_ACCESS['/dashboard']}><Dashboard /></PrivateRoute>} />
+            <Route path="/employees" element={<PrivateRoute allowedRoles={ROUTE_ACCESS['/employees']}><Employees /></PrivateRoute>} />
+            <Route path="/attendance" element={<PrivateRoute allowedRoles={ROUTE_ACCESS['/attendance']}><Attendance /></PrivateRoute>} />
+            <Route path="/shifts" element={<PrivateRoute allowedRoles={ROUTE_ACCESS['/shifts']}><Shifts /></PrivateRoute>} />
+            <Route path="/leave" element={<PrivateRoute allowedRoles={ROUTE_ACCESS['/leave']}><Leave /></PrivateRoute>} />
+            <Route path="/recruitment" element={<PrivateRoute allowedRoles={ROUTE_ACCESS['/recruitment']}><Recruitment /></PrivateRoute>} />
+            <Route path="/training" element={<PrivateRoute allowedRoles={ROUTE_ACCESS['/training']}><Training /></PrivateRoute>} />
+            <Route path="/payroll" element={<PrivateRoute allowedRoles={ROUTE_ACCESS['/payroll']}><Payroll /></PrivateRoute>} />
+            <Route path="/performance" element={<PrivateRoute allowedRoles={ROUTE_ACCESS['/performance']}><Performance /></PrivateRoute>} />
           </Route>
           
           {/* Catch all */}

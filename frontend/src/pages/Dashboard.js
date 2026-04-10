@@ -29,8 +29,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import axios from 'axios';
 import { format, parseISO } from 'date-fns';
 import { API_URL } from '../config/api';
+import { MENU_ITEMS, getStoredUser } from '../config/access';
 
 export default function Dashboard() {
+  const user = getStoredUser();
   const [stats, setStats] = useState({
     employees: 0,
     present: 0,
@@ -50,16 +52,25 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
+      const canViewEmployees = ['director', 'hr', 'production_manager'].includes(user.role);
+      const canViewAttendance = ['director', 'hr', 'production_manager', 'shift_supervisor'].includes(user.role);
+      const canViewSchedules = ['director', 'hr', 'production_manager'].includes(user.role);
 
-      // Fetch employees
-      const employeesRes = await axios.get(`${API_URL}/employees`, { headers });
+      const employeesPromise = canViewEmployees
+        ? axios.get(`${API_URL}/employees`, { headers })
+        : Promise.resolve({ data: { data: [] } });
+      const attendancePromise = canViewAttendance
+        ? axios.get(`${API_URL}/attendance/today`, { headers })
+        : Promise.resolve({ data: { details: [] } });
+      const schedulesPromise = canViewSchedules
+        ? axios.get(`${API_URL}/shifts/schedules?weekStart=${format(new Date(), 'yyyy-MM-dd')}`, { headers })
+        : Promise.resolve({ data: { total: 0 } });
 
-      // Fetch today's attendance
-      const attendanceRes = await axios.get(`${API_URL}/attendance/today`, { headers });
-
-      // Fetch schedules
-      const today = format(new Date(), 'yyyy-MM-dd');
-      const schedulesRes = await axios.get(`${API_URL}/shifts/schedules?weekStart=${today}`, { headers });
+      const [employeesRes, attendanceRes, schedulesRes] = await Promise.all([
+        employeesPromise,
+        attendancePromise,
+        schedulesPromise
+      ]);
 
       const employees = employeesRes.data.data || [];
       const attendance = attendanceRes.data.details || [];
@@ -111,6 +122,26 @@ export default function Dashboard() {
   if (loading) {
     return <LinearProgress />;
   }
+
+  const quickActions = MENU_ITEMS.filter(
+    (item) =>
+      item.roles.includes(user.role) &&
+      ['/attendance', '/leave', '/employees', '/training'].includes(item.path)
+  );
+
+  const quickActionIcons = {
+    '/attendance': <AccessTime />,
+    '/leave': <BeachAccess />,
+    '/employees': <People />,
+    '/training': <TrendingUp />
+  };
+
+  const quickActionLabels = {
+    '/attendance': 'Mark Attendance',
+    '/leave': 'Leave Request',
+    '/employees': 'New Employee',
+    '/training': 'Training'
+  };
 
   return (
     <Box>
@@ -273,46 +304,20 @@ export default function Dashboard() {
                 Quick Actions
               </Typography>
               <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    startIcon={<AccessTime />}
-                    onClick={() => window.location.href = '/attendance'}
-                  >
-                    Mark Attendance
-                  </Button>
-                </Grid>
-                <Grid item xs={6}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    startIcon={<BeachAccess />}
-                    onClick={() => window.location.href = '/leave'}
-                  >
-                    Leave Request
-                  </Button>
-                </Grid>
-                <Grid item xs={6}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    startIcon={<People />}
-                    onClick={() => window.location.href = '/employees'}
-                  >
-                    New Employee
-                  </Button>
-                </Grid>
-                <Grid item xs={6}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    startIcon={<TrendingUp />}
-                    onClick={() => window.location.href = '/training'}
-                  >
-                    Training
-                  </Button>
-                </Grid>
+                {quickActions.map((action) => (
+                  <Grid item xs={6} key={action.path}>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      startIcon={quickActionIcons[action.path]}
+                      onClick={() => {
+                        window.location.href = action.path;
+                      }}
+                    >
+                      {quickActionLabels[action.path]}
+                    </Button>
+                  </Grid>
+                ))}
               </Grid>
             </CardContent>
           </Card>
