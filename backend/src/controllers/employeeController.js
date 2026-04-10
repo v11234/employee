@@ -1,6 +1,24 @@
 const { Employee, User, Department, Position, ProductionLine, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
+const sanitizeOptionalString = (value) => {
+  if (typeof value !== 'string') {
+    return value ?? null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+};
+
+const sanitizeOptionalInt = (value) => {
+  if (value === '' || value === null || value === undefined) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
 // @desc    Create a new employee
 // @route   POST /api/employees
 // @access  Private (HR, Director)
@@ -20,26 +38,32 @@ const createEmployee = async (req, res) => {
       emergencyContactPhone
     } = req.body;
 
+    const payload = {
+      employeeCode: sanitizeOptionalString(employeeCode),
+      firstName: sanitizeOptionalString(firstName),
+      lastName: sanitizeOptionalString(lastName),
+      birthDate: sanitizeOptionalString(birthDate),
+      hireDate: sanitizeOptionalString(hireDate),
+      employmentStatus: sanitizeOptionalString(employmentStatus) || 'temporary',
+      departmentId: sanitizeOptionalInt(departmentId),
+      positionId: sanitizeOptionalInt(positionId),
+      productionLineId: sanitizeOptionalInt(productionLineId),
+      emergencyContactName: sanitizeOptionalString(emergencyContactName),
+      emergencyContactPhone: sanitizeOptionalString(emergencyContactPhone)
+    };
+
+    if (!payload.employeeCode || !payload.firstName || !payload.lastName || !payload.hireDate) {
+      return res.status(400).json({ message: 'Employee code, first name, last name, and hire date are required' });
+    }
+
     // Check if employee code already exists
-    const existingEmployee = await Employee.findOne({ where: { employeeCode } });
+    const existingEmployee = await Employee.findOne({ where: { employeeCode: payload.employeeCode } });
     if (existingEmployee) {
       return res.status(400).json({ message: 'Employee code already exists' });
     }
 
     // Create employee
-    const employee = await Employee.create({
-      employeeCode,
-      firstName,
-      lastName,
-      birthDate,
-      hireDate,
-      employmentStatus,
-      departmentId,
-      positionId,
-      productionLineId,
-      emergencyContactName,
-      emergencyContactPhone
-    });
+    const employee = await Employee.create(payload);
 
     // Fetch created employee with associations
     const newEmployee = await Employee.findByPk(employee.id, {
@@ -171,19 +195,21 @@ const updateEmployee = async (req, res) => {
       isActive
     } = req.body;
 
-    // Update employee
-    await employee.update({
-      firstName,
-      lastName,
-      birthDate,
-      employmentStatus,
-      departmentId,
-      positionId,
-      productionLineId,
-      emergencyContactName,
-      emergencyContactPhone,
+    const payload = {
+      firstName: sanitizeOptionalString(firstName),
+      lastName: sanitizeOptionalString(lastName),
+      birthDate: sanitizeOptionalString(birthDate),
+      employmentStatus: sanitizeOptionalString(employmentStatus),
+      departmentId: sanitizeOptionalInt(departmentId),
+      positionId: sanitizeOptionalInt(positionId),
+      productionLineId: sanitizeOptionalInt(productionLineId),
+      emergencyContactName: sanitizeOptionalString(emergencyContactName),
+      emergencyContactPhone: sanitizeOptionalString(emergencyContactPhone),
       isActive
-    });
+    };
+
+    // Update employee
+    await employee.update(payload);
 
     // Fetch updated employee with associations
     const updatedEmployee = await Employee.findByPk(employee.id, {

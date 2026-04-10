@@ -230,13 +230,27 @@ export default function Employees() {
   const handleSubmit = async () => {
     try {
       const token = localStorage.getItem('token');
+      const payload = {
+        employeeCode: formData.employeeCode?.trim(),
+        firstName: formData.firstName?.trim(),
+        lastName: formData.lastName?.trim(),
+        birthDate: formData.birthDate || null,
+        hireDate: formData.hireDate || null,
+        employmentStatus: formData.employmentStatus,
+        departmentId: formData.departmentId ? Number(formData.departmentId) : null,
+        positionId: formData.positionId ? Number(formData.positionId) : null,
+        productionLineId: formData.productionLineId ? Number(formData.productionLineId) : null,
+        emergencyContactName: formData.emergencyContactName?.trim() || null,
+        emergencyContactPhone: formData.emergencyContactPhone?.trim() || null
+      };
+
       if (dialogMode === 'add') {
-        await axios.post(`${API_URL}/employees`, formData, {
+        await axios.post(`${API_URL}/employees`, payload, {
           headers: { Authorization: `Bearer ${token}` }
         });
         showSnackbar('Employee added successfully');
       } else if (dialogMode === 'edit') {
-        await axios.put(`${API_URL}/employees/${selectedEmployee.id}`, formData, {
+        await axios.put(`${API_URL}/employees/${selectedEmployee.id}`, payload, {
           headers: { Authorization: `Bearer ${token}` }
         });
         showSnackbar('Employee updated successfully');
