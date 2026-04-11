@@ -76,16 +76,53 @@ const updatePasskeyCounter = async (user, credentialId, counter) => {
   }
 };
 
+const normalizeOriginValue = (value) => {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  try {
+    return new URL(value).origin;
+  } catch (err) {
+    try {
+      return new URL(`https://${value}`).origin;
+    } catch (innerErr) {
+      return null;
+    }
+  }
+};
+
+const normalizeRpIdValue = (value) => {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  let rpId = value.trim();
+  if (rpId.startsWith('https://') || rpId.startsWith('http://')) {
+    try {
+      rpId = new URL(rpId).hostname;
+    } catch (err) {
+      rpId = rpId.replace(/^https?:\/\//, '');
+    }
+  }
+
+  rpId = rpId.replace(/\/.*$/, '');
+  rpId = rpId.replace(/:\d+$/, '');
+  return rpId;
+};
+
 const getWebAuthnConfig = (req) => {
-  const forwardedProto = req.headers['x-forwarded-proto'];
-  const forwardedHost = req.headers['x-forwarded-host'];
-  const host = forwardedHost || req.headers.host || 'localhost:3000';
-  const originHeader = req.headers.origin;
+  const forwardedProto = req.headers['x-forwarded-proto'] || req.headers['x-vercel-forwarded-proto'];
+  const forwardedHost = req.headers['x-forwarded-host'] || req.headers['x-vercel-forwarded-host'];
+  const originHeader = req.headers.origin || req.headers.referer;
   const protocol = process.env.NODE_ENV === 'production'
     ? (forwardedProto || 'https')
     : (forwardedProto || req.protocol || 'http');
-  const derivedOrigin = originHeader || `${protocol}://${host}`;
-  const derivedRpId = process.env.WEBAUTHN_RP_ID || new URL(derivedOrigin).hostname;
+  const host = forwardedHost || req.headers.host || 'localhost:3000';
+
+  const clientOrigin = normalizeOriginValue(originHeader) || normalizeOriginValue(`${protocol}://${host}`) || 'http://localhost:3000';
+  const derivedOrigin = normalizeOriginValue(process.env.WEBAUTHN_ORIGIN) || clientOrigin;
+  const derivedRpId = normalizeRpIdValue(process.env.WEBAUTHN_RP_ID) || new URL(derivedOrigin).hostname;
 
   return {
     rpID: derivedRpId,
