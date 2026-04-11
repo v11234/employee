@@ -14,18 +14,9 @@ import { toast } from 'react-toastify';
 import iulLogo from '../assets/iul-logo.svg';
 import { API_URL } from '../config/api';
 
-const base64UrlToBuffer = (value) => {
-  if (value instanceof ArrayBuffer) return value;
-  if (ArrayBuffer.isView(value)) return value.buffer;
-  if (value && typeof value === 'object' && Array.isArray(value.data)) {
-    return new Uint8Array(value.data).buffer;
-  }
-  if (typeof value !== 'string') {
-    throw new TypeError(`Expected a base64url string or ArrayBuffer, got ${typeof value}`);
-  }
-
-  const padding = '='.repeat((4 - (value.length % 4)) % 4);
-  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+const base64UrlToBuffer = (base64Url) => {
+  const padding = '='.repeat((4 - (base64Url.length % 4)) % 4);
+  const base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/');
   const binary = window.atob(base64);
   const bytes = new Uint8Array(binary.length);
 
@@ -37,7 +28,7 @@ const base64UrlToBuffer = (value) => {
 };
 
 const bufferToBase64Url = (buffer) => {
-  const bytes = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : new Uint8Array(buffer);
+  const bytes = new Uint8Array(buffer);
   let binary = '';
   bytes.forEach((byte) => {
     binary += String.fromCharCode(byte);

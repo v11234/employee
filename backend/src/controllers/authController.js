@@ -76,66 +76,16 @@ const updatePasskeyCounter = async (user, credentialId, counter) => {
   }
 };
 
-const normalizeOrigin = (value) => {
-  if (!value || typeof value !== 'string') return null;
-
-  try {
-    const url = new URL(value);
-    return url.origin;
-  } catch (error) {
-    try {
-      return new URL(`https://${value}`).origin;
-    } catch (innerError) {
-      return null;
-    }
-  }
-};
-
-const normalizeRpId = (value, origin) => {
-  if (!value || typeof value !== 'string') return null;
-
-  let candidate = value.trim();
-  if (candidate.startsWith('http://') || candidate.startsWith('https://')) {
-    try {
-      candidate = new URL(candidate).hostname;
-    } catch (error) {
-      candidate = candidate.replace(/^https?:\/\//, '');
-      candidate = candidate.split('/')[0];
-    }
-  }
-
-  candidate = candidate.replace(/:\d+$/, '');
-  if (origin) {
-    const originHost = new URL(origin).hostname;
-    if (candidate === originHost || originHost.endsWith(`.${candidate}`)) {
-      return candidate;
-    }
-  }
-
-  return candidate;
-};
-
-const getClientOrigin = (req) => {
-  const forwardedProto = req.headers['x-forwarded-proto'] || req.headers['x-vercel-forwarded-proto'];
-  const forwardedHost = req.headers['x-forwarded-host'] || req.headers['x-vercel-forwarded-host'];
-  const originHeader = req.headers.origin || req.headers.referer;
-  const protocol = process.env.NODE_ENV === 'production'
-    ? forwardedProto || req.protocol || 'https'
-    : forwardedProto || req.protocol || 'http';
-  const host = forwardedHost || req.headers.host || 'localhost:3000';
-
-  if (originHeader) {
-    const normalized = normalizeOrigin(originHeader);
-    if (normalized) return normalized;
-  }
-
-  return normalizeOrigin(`${protocol}://${host}`) || 'http://localhost:3000';
-};
-
 const getWebAuthnConfig = (req) => {
-  const clientOrigin = getClientOrigin(req);
-  const derivedOrigin = normalizeOrigin(process.env.WEBAUTHN_ORIGIN) || clientOrigin;
-  const derivedRpId = normalizeRpId(process.env.WEBAUTHN_RP_ID, derivedOrigin) || new URL(derivedOrigin).hostname;
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  const forwardedHost = req.headers['x-forwarded-host'];
+  const host = forwardedHost || req.headers.host || 'localhost:3000';
+  const originHeader = req.headers.origin;
+  const protocol = process.env.NODE_ENV === 'production'
+    ? (forwardedProto || 'https')
+    : (forwardedProto || req.protocol || 'http');
+  const derivedOrigin = originHeader || `${protocol}://${host}`;
+  const derivedRpId = process.env.WEBAUTHN_RP_ID || new URL(derivedOrigin).hostname;
 
   return {
     rpID: derivedRpId,
