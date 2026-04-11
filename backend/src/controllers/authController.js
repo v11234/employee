@@ -76,20 +76,29 @@ const updatePasskeyCounter = async (user, credentialId, counter) => {
   }
 };
 
-const getWebAuthnConfig = (req) => {
-  const forwardedProto = req.headers['x-forwarded-proto'];
-  const forwardedHost = req.headers['x-forwarded-host'];
-  const host = forwardedHost || req.headers.host || 'localhost:3000';
-  const originHeader = req.headers.origin;
+const getClientOrigin = (req) => {
+  const forwardedProto = req.headers['x-forwarded-proto'] || req.headers['x-vercel-forwarded-proto'];
+  const forwardedHost = req.headers['x-forwarded-host'] || req.headers['x-vercel-forwarded-host'];
+  const originHeader = req.headers.origin || req.headers.referer;
   const protocol = process.env.NODE_ENV === 'production'
-    ? (forwardedProto || 'https')
-    : (forwardedProto || req.protocol || 'http');
-  const derivedOrigin = originHeader || `${protocol}://${host}`;
-  const derivedRpId = new URL(derivedOrigin).hostname;
+    ? forwardedProto || req.protocol || 'https'
+    : forwardedProto || req.protocol || 'http';
+  const host = forwardedHost || req.headers.host || 'localhost:3000';
+
+  if (originHeader) {
+    return originHeader;
+  }
+
+  return `${protocol}://${host}`;
+};
+
+const getWebAuthnConfig = (req) => {
+  const derivedOrigin = process.env.WEBAUTHN_ORIGIN || getClientOrigin(req);
+  const derivedRpId = process.env.WEBAUTHN_RP_ID || new URL(derivedOrigin).hostname;
 
   return {
-    rpID: process.env.WEBAUTHN_RP_ID || derivedRpId,
-    rpOrigin: process.env.WEBAUTHN_ORIGIN || derivedOrigin
+    rpID: derivedRpId,
+    rpOrigin: derivedOrigin
   };
 };
 
