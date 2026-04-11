@@ -210,7 +210,7 @@ const generateRegistrationOptionsHandler = async (req, res) => {
         userVerification: 'preferred'
       },
       excludeCredentials: passkeys.map((passkey) => ({
-        id: passkey.id,
+        id: Buffer.from(passkey.id, 'base64url'),
         type: 'public-key',
         transports: ['internal', 'hybrid', 'usb', 'nfc', 'ble']
       }))
@@ -307,7 +307,7 @@ const generateAuthenticationOptionsHandler = async (req, res) => {
       rpID,
       userVerification: 'preferred',
       allowCredentials: passkeys.map((passkey) => ({
-          id: passkey.id,
+          id: Buffer.from(passkey.id, 'base64url'),
           type: 'public-key',
           transports: ['internal', 'hybrid', 'usb', 'nfc', 'ble']
         }))

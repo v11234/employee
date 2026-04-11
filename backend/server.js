@@ -8,6 +8,9 @@ dotenv.config();
 
 const app = express();
 
+// Trust proxy headers when deployed behind Vercel / reverse proxies
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
