@@ -77,10 +77,10 @@ const updatePasskeyCounter = async (user, credentialId, counter) => {
 };
 
 const getWebAuthnConfig = (req) => {
-  const forwardedProto = req.headers['x-forwarded-proto'];
-  const forwardedHost = req.headers['x-forwarded-host'];
+  const forwardedProto = req.headers['x-forwarded-proto'] || req.headers['x-vercel-forwarded-proto'];
+  const forwardedHost = req.headers['x-forwarded-host'] || req.headers['x-vercel-forwarded-host'];
   const host = forwardedHost || req.headers.host || 'localhost:3000';
-  const originHeader = req.headers.origin;
+  const originHeader = req.headers.origin || req.headers.referer;
   const protocol = process.env.NODE_ENV === 'production'
     ? (forwardedProto || 'https')
     : (forwardedProto || req.protocol || 'http');
