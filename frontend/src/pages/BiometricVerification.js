@@ -15,6 +15,12 @@ import iulLogo from '../assets/iul-logo.svg';
 import { API_URL } from '../config/api';
 
 const base64UrlToBuffer = (base64Url) => {
+  if (base64Url instanceof ArrayBuffer) return base64Url;
+  if (ArrayBuffer.isView(base64Url)) return base64Url.buffer;
+  if (typeof base64Url !== 'string') {
+    throw new TypeError(`Expected a base64url string or ArrayBuffer, got ${typeof base64Url}`);
+  }
+
   const padding = '='.repeat((4 - (base64Url.length % 4)) % 4);
   const base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/');
   const binary = window.atob(base64);
@@ -28,7 +34,7 @@ const base64UrlToBuffer = (base64Url) => {
 };
 
 const bufferToBase64Url = (buffer) => {
-  const bytes = new Uint8Array(buffer);
+  const bytes = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : new Uint8Array(buffer);
   let binary = '';
   bytes.forEach((byte) => {
     binary += String.fromCharCode(byte);
