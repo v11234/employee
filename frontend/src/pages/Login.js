@@ -29,6 +29,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [debugInfo, setDebugInfo] = useState('');
   const navigate = useNavigate();
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,6 +41,7 @@ export default function Login() {
 
     setLoading(true);
     setError('');
+    setDebugInfo('');
 
     try {
       const response = await axios.post(`${API_URL}/auth/login`, {
@@ -66,6 +68,12 @@ export default function Login() {
         err.message;
 
       setError(serverMessage || 'Login failed. Please try again.');
+      setDebugInfo([
+        `API: ${API_URL}/auth/login`,
+        `Message: ${err.message || 'n/a'}`,
+        `HTTP Status: ${err.response?.status || 'none'}`,
+        `Response: ${JSON.stringify(err.response?.data || null)}`
+      ].join(' | '));
     } finally {
       setLoading(false);
     }
@@ -113,9 +121,16 @@ export default function Login() {
             </Typography>
 
             {error && (
-              <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
-                {error}
-              </Alert>
+              <>
+                <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
+                  {error}
+                </Alert>
+                {debugInfo && (
+                  <Alert severity="info" sx={{ width: '100%', mb: 2, wordBreak: 'break-word' }}>
+                    {debugInfo}
+                  </Alert>
+                )}
+              </>
             )}
 
             <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
